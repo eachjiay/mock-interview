@@ -1,11 +1,14 @@
 import type { Request, Response } from 'express';
+import type { ScoringProviderName, TranscriptProviderName } from '../types.js';
 import {
-  analyzeInterview,
   createInterviewSession,
   getInterviewDetail,
   markInterviewFailed,
+  queueFullInterviewProcessing,
+  queueInterviewAnalysis,
+  queueInterviewTranscription,
   saveInterviewAudio,
-  transcribeInterview
+  segmentInterviewTranscript,
 } from '../services/interviewService.js';
 
 function toInterviewId(value: string) {
@@ -66,11 +69,8 @@ export async function processInterviewUpload(req: Request, res: Response) {
     });
     interviewId = interview.id;
     await saveInterviewAudio(interviewId, file.path, file.originalname);
-    const transcripts = await transcribeInterview(interviewId, providers);
-    await analyzeInterview(interviewId, transcripts[0]?.provider);
-
-    const detail = await getInterviewDetail(interviewId);
-    res.status(201).json(detail);
+    const task = await queueFullInterviewProcessing(interviewId, providers);
+    res.status(202).json(task);
   } catch (error) {
     if (interviewId > 0) {
       await markInterviewFailed(interviewId);
@@ -96,8 +96,8 @@ export async function uploadAudio(req: Request, res: Response) {
 export async function transcribe(req: Request, res: Response) {
   try {
     const interviewId = toInterviewId(getParamId(req));
-    const transcripts = await transcribeInterview(interviewId, req.body.providers);
-    res.json({ transcripts });
+    const task = await queueInterviewTranscription(interviewId, req.body.providers);
+    res.status(202).json(task);
   } catch (error) {
     await safeFail(req.params.id);
     res.status(500).json({ error: (error as Error).message });
@@ -107,9 +107,15 @@ export async function transcribe(req: Request, res: Response) {
 export async function analyze(req: Request, res: Response) {
   try {
     const interviewId = toInterviewId(getParamId(req));
-    const provider = Array.isArray(req.body.provider) ? req.body.provider[0] : req.body.provider;
-    const analysis = await analyzeInterview(interviewId, provider);
-    res.json(analysis);
+    const transcriptProvider = normalizeTranscriptProvider(req.body.transcriptProvider || req.body.provider);
+    const scoringProvider = normalizeScoringProvider(req.body.scoringProvider);
+    const audioFileUrl = normalizeOptionalString(req.body.audioFileUrl);
+    const task = await queueInterviewAnalysis(interviewId, {
+      preferredTranscriptProvider: transcriptProvider,
+      scoringProvider,
+      audioFileUrl
+    });
+    res.status(202).json(task);
   } catch (error) {
     await safeFail(req.params.id);
     res.status(500).json({ error: (error as Error).message });
@@ -124,6 +130,17 @@ export async function getInterview(req: Request, res: Response) {
       return res.status(404).json({ error: 'Interview not found.' });
     }
     res.json(detail);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+export async function segmentInterview(req: Request, res: Response) {
+  try {
+    const interviewId = toInterviewId(getParamId(req));
+    const provider = normalizeTranscriptProvider(req.body.provider);
+    const result = await segmentInterviewTranscript(interviewId, provider);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -149,4 +166,38 @@ function normalizeOptionalNumber(value: unknown) {
     throw new Error('Invalid numeric identifier.');
   }
   return numberValue;
+}
+
+function normalizeTranscriptProvider(value: unknown) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized !== 'openai' && normalized !== 'xunfei' && normalized !== 'volcengine') {
+    throw new Error('Invalid transcript provider.');
+  }
+  return normalized as TranscriptProviderName;
+}
+
+function normalizeScoringProvider(value: unknown) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized !== 'openai' && normalized !== 'xunfei') {
+    throw new Error('Invalid scoring provider.');
+  }
+  return normalized as ScoringProviderName;
+}
+
+function normalizeOptionalString(value: unknown) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const normalized = Array.isArray(value) ? value[0] : value;
+  if (typeof normalized !== 'string') {
+    return undefined;
+  }
+  const trimmed = normalized.trim();
+  return trimmed || undefined;
 }

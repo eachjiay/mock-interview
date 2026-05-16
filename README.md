@@ -1,6 +1,6 @@
 # mock-interview-backend
 
-Standalone backend for AI mock interviews. It can import interview documents into a question bank, randomly pick questions, accept audio uploads, run one or more transcription providers, and score the transcript against the selected reference answer.
+Standalone backend for AI mock interviews. It can import interview documents into a question bank, randomly pick questions, accept audio uploads, run one or more transcription providers, and score the transcript against the selected reference answer. Long-running transcription and scoring are handled asynchronously so the frontend can poll status instead of waiting on one request.
 
 ## What is included
 
@@ -10,10 +10,13 @@ Standalone backend for AI mock interviews. It can import interview documents int
 - `GET /api/documents/:id` get one document and its extracted questions
 - `GET /api/documents/:id/questions/random?count=3` sample random questions from one document
 - `POST /api/transcriptions` upload an audio file and transcribe it directly with `openai` or `xunfei`
+- `POST /api/transcriptions/clean` clean raw ASR transcript text for display and downstream scoring
+- `POST /api/transcriptions/segment` split transcript text into interviewer/candidate-like segments and Q/A pairs
 - `POST /api/interviews` create an interview record
 - `POST /api/interviews/process` create a record, upload audio, transcribe, and analyze in one call
 - `POST /api/interviews/:id/audio` upload an audio file to an existing interview
 - `POST /api/interviews/:id/transcribe` run transcription providers such as `openai`
+- `POST /api/interviews/:id/segment` segment the latest transcript of an interview into Q/A pairs
 - `POST /api/interviews/:id/analyze` score the transcript against the reference text
 - `GET /api/interviews/:id` fetch the interview, transcripts, and latest analysis
 
@@ -91,18 +94,43 @@ If you already know the exact question, you can pass `questionId` instead of `do
 
 Field name must be `audio`. The upload layer accepts `mp3`, `mp4`, `mpeg`, `mpga`, `m4a`, `wav`, `webm`, `flac`, and `opus`.
 
-3. Run transcription
+3. Queue transcription
 
 ```http
 POST /api/interviews/1/transcribe
 Content-Type: application/json
 
 {
-  "providers": ["openai", "xunfei"]
+  "providers": ["auto"]
 }
 ```
 
-4. Run analysis
+The API now returns `202 Accepted` with a task payload like:
+
+```json
+{
+  "interviewId": 1,
+  "status": "transcribing",
+  "providers": ["xunfei"]
+}
+```
+
+4. Poll interview detail
+
+```http
+GET /api/interviews/1
+```
+
+Watch `interview.status`:
+
+- `uploaded`
+- `transcribing`
+- `transcribed`
+- `analyzing`
+- `analyzed`
+- `failed`
+
+5. Queue analysis
 
 ```http
 POST /api/interviews/1/analyze
@@ -129,7 +157,7 @@ Form fields:
 - `candidateName`: optional
 - `questionText`: optional
 - `notes`: optional
-- `providers`: optional, for example `openai`
+- `providers`: optional, for example `openai`, `xunfei`, or `auto`
 
 ## Direct transcription flow
 
@@ -144,10 +172,54 @@ Form fields:
 - `provider`: optional, single provider such as `openai` or `xunfei`
 - `providers`: optional, comma-separated or repeated values such as `openai,xunfei`
 
+## Transcript cleaning flow
+
+```http
+POST /api/transcriptions/clean
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "transcriptText": "嗯面试官你好 我叫...",
+  "keepParagraphs": true
+}
+```
+
+Response fields:
+
+- `cleanedText`: cleaned transcript text
+- `removedFillers`: filler words removed or normalized
+- `notes`: cleanup notes such as obvious ASR noise fixes
+
+## Transcript segmentation flow
+
+```http
+POST /api/transcriptions/segment
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "transcriptText": "面试官你好，我先做一下自我介绍..."
+}
+```
+
+Response fields:
+
+- `segments`: ordered transcript segments with `speakerGuess`
+- `qaPairs`: question-answer pairs inferred from the transcript
+- `notes`: segmentation notes
+
 ## Notes
 
 - The upload middleware accepts the union of formats supported by OpenAI and Xunfei. OpenAI itself currently limits uploads to `25 MB`, while Xunfei long-form ASR supports up to `500 MB`.
 - `xunfei` and `openai` are wired. `volcengine` is still a placeholder.
+- When `providers` is omitted or set to `auto`, the backend now auto-selects `openai` for files within the configured OpenAI size limit and falls back to `xunfei` for larger files.
 - The document parser is optimized for interview notes that follow a `question -> answer` structure like your `八股.docx` and `提问文档.docx`.
 - OpenAI speech-to-text currently supports `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`, with `25 MB` file upload limits according to the official docs:
   - [Speech to text guide](https://platform.openai.com/docs/guides/speech-to-text?lang=javascript)

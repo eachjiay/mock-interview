@@ -8,6 +8,8 @@ interface InterviewRow extends CreateInterviewInput {
   audioPath?: string | null;
   audioOriginalName?: string | null;
   status: InterviewStatus;
+  activeTranscriptProvider?: 'openai' | 'xunfei' | 'volcengine' | null;
+  errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
 }

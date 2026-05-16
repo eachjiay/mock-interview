@@ -224,6 +224,81 @@ Example response:
 }
 ```
 
+## 6.1 Clean raw transcript text
+
+Useful when you want to turn raw ASR output into a cleaner version before showing it to the user or sending it into scoring.
+
+```ts
+export async function cleanTranscriptText(transcriptText: string, keepParagraphs = true) {
+  const response = await fetch(`${BASE_URL}/api/transcriptions/clean`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      transcriptText,
+      keepParagraphs
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+## 6.2 Segment transcript into interviewer/candidate blocks
+
+Useful when the uploaded audio contains both the interviewer and the candidate, and the frontend wants a readable conversation view.
+
+```ts
+export async function segmentTranscriptText(transcriptText: string) {
+  const response = await fetch(`${BASE_URL}/api/transcriptions/segment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ transcriptText })
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+Example response shape:
+
+```json
+{
+  "segments": [
+    {
+      "speakerGuess": "interviewer",
+      "text": "请你先做一个自我介绍？",
+      "reasons": ["question-mark", "interviewer:请你"]
+    },
+    {
+      "speakerGuess": "candidate",
+      "text": "面试官你好，我叫张三，来自...",
+      "reasons": ["candidate:我叫"]
+    }
+  ],
+  "qaPairs": [
+    {
+      "question": "请你先做一个自我介绍？",
+      "answer": "面试官你好，我叫张三，来自...",
+      "questionSpeaker": "interviewer",
+      "answerSpeaker": "candidate"
+    }
+  ],
+  "notes": ["Generated 1 question-answer pairs."]
+}
+```
+
 ## 7. Full interview flow with separate steps
 
 ### Step A: create interview
@@ -252,7 +327,7 @@ export async function uploadInterviewAudio(interviewId: number, file: File) {
 }
 ```
 
-### Step C: run transcription
+### Step C: queue transcription
 
 ```ts
 export async function transcribeInterview(interviewId: number, providers: string[] = ["openai"]) {
@@ -270,6 +345,12 @@ export async function transcribeInterview(interviewId: number, providers: string
 
   return response.json();
 }
+```
+
+Recommended usage:
+
+```ts
+await transcribeInterview(interview.id, ["auto"]);
 ```
 
 ### Step D: run analysis
@@ -292,6 +373,26 @@ export async function analyzeInterview(interviewId: number, provider = "openai")
 }
 ```
 
+### Step D.1: segment the latest interview transcript
+
+```ts
+export async function segmentInterview(interviewId: number, provider?: string) {
+  const response = await fetch(`${BASE_URL}/api/interviews/${interviewId}/segment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(provider ? { provider } : {})
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
 ### Step E: get interview detail
 
 ```ts
@@ -304,9 +405,26 @@ export async function getInterviewDetail(interviewId: number) {
 }
 ```
 
+### Step F: poll status
+
+```ts
+export async function pollInterviewUntilDone(interviewId: number) {
+  while (true) {
+    const detail = await getInterviewDetail(interviewId);
+    const status = detail.interview.status;
+
+    if (status === "analyzed" || status === "failed") {
+      return detail;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+```
+
 ## 8. One-shot interview processing
 
-If the frontend wants one request from audio upload to final score:
+If the frontend wants one request from audio upload to task creation:
 
 ```ts
 export async function processInterviewOnce(params: {
@@ -398,12 +516,15 @@ Recommended practical flow:
 3. Show one question to the user
 4. Record audio
 5. Create interview with `questionId`
-6. Upload audio and transcribe
-7. Analyze and render the result page
+6. Upload audio
+7. Queue transcription with `providers=["auto"]`
+8. Poll status until `transcribed`
+9. Queue analysis
+10. Poll status until `analyzed`
 
 If your frontend wants the simplest path:
 
 1. Upload the interview document once
 2. Pick a random question
 3. Call `POST /api/interviews/process`
-4. Show the final score directly
+4. Poll `GET /api/interviews/:id` until the score is ready

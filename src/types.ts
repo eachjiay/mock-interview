@@ -1,6 +1,14 @@
-export type InterviewStatus = 'created' | 'uploaded' | 'transcribed' | 'analyzed' | 'failed';
+export type InterviewStatus =
+  | 'created'
+  | 'uploaded'
+  | 'transcribing'
+  | 'transcribed'
+  | 'analyzing'
+  | 'analyzed'
+  | 'failed';
 
 export type TranscriptProviderName = 'openai' | 'xunfei' | 'volcengine';
+export type ScoringProviderName = 'openai' | 'xunfei';
 
 export interface CreateInterviewInput {
   candidateName?: string;
@@ -16,6 +24,8 @@ export interface InterviewRecord extends CreateInterviewInput {
   audioPath?: string | null;
   audioOriginalName?: string | null;
   status: InterviewStatus;
+  activeTranscriptProvider?: TranscriptProviderName | null;
+  errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +66,45 @@ export interface AnalysisResult {
   gaps: string[];
   mismatches: string[];
   raw?: unknown;
+}
+
+export interface TranscriptCleanResult {
+  cleanedText: string;
+  removedFillers: string[];
+  notes: string[];
+  raw?: unknown;
+}
+
+export type SpeakerGuess = 'interviewer' | 'candidate' | 'unknown';
+
+export interface TranscriptSegment {
+  speakerGuess: SpeakerGuess;
+  text: string;
+  reasons: string[];
+}
+
+export interface TranscriptQaPair {
+  question: string;
+  answer: string;
+  questionSpeaker: SpeakerGuess;
+  answerSpeaker: SpeakerGuess;
+}
+
+export interface TranscriptSegmentResult {
+  segments: TranscriptSegment[];
+  qaPairs: TranscriptQaPair[];
+  notes: string[];
+}
+
+export interface XunfeiVoiceInsightResult {
+  taskId: string;
+  status: 'Running' | 'Finish' | 'Error';
+  transcriptText?: string;
+  subTaskResults: Array<{
+    name: string;
+    status: string;
+    result: unknown;
+  }>;
 }
 
 export interface StoredTranscript {

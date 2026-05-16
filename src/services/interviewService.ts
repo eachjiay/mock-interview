@@ -12,10 +12,24 @@ import {
   updateInterviewStatus
 } from '../repositories/interviewRepository.js';
 import { scoreTranscript } from './scoringService.js';
-import { parseProviderList } from './transcription/index.js';
-import { transcribeAudioFile } from './transcriptionService.js';
-import type { CreateInterviewInput, InterviewDetail, InterviewRecord, TranscriptProviderName, TranscriptResult } from '../types.js';
+import { transcribeAudioFile, resolveTranscriptionProviders } from './transcriptionService.js';
+import type {
+  CreateInterviewInput,
+  InterviewDetail,
+  InterviewRecord,
+  ScoringProviderName,
+  TranscriptProviderName,
+  TranscriptResult
+} from '../types.js';
 import { getQuestionForInterview } from './documentService.js';
+import { runJob } from './jobRunnerService.js';
+import { segmentTranscript } from './transcriptSegmentationService.js';
+
+interface AnalyzeInterviewOptions {
+  preferredTranscriptProvider?: TranscriptProviderName;
+  scoringProvider?: ScoringProviderName;
+  audioFileUrl?: string;
+}
 
 export async function createInterviewSession(input: CreateInterviewInput): Promise<InterviewRecord> {
   let payload = input;
@@ -58,11 +72,8 @@ export async function transcribeInterview(interviewId: number, providerInput?: u
     throw new Error('Audio has not been uploaded yet.');
   }
 
-  const providers = parseProviderList(providerInput);
-  const fullAudioPath = path.isAbsolute(interview.audioPath)
-    ? interview.audioPath
-    : path.join(process.cwd(), interview.audioPath);
-
+  const fullAudioPath = resolveStoredAudioPath(interview.audioPath);
+  const providers = await resolveTranscriptionProviders(fullAudioPath, providerInput);
   const results = await transcribeAudioFile(fullAudioPath, providers);
   for (const transcript of results) {
     await saveTranscript(interviewId, transcript);
@@ -70,27 +81,38 @@ export async function transcribeInterview(interviewId: number, providerInput?: u
   return results;
 }
 
-export async function analyzeInterview(interviewId: number, preferredProvider?: TranscriptProviderName) {
+export async function analyzeInterview(interviewId: number, options: AnalyzeInterviewOptions = {}) {
   const interview = await getInterviewById(interviewId);
   if (!interview) {
     throw new Error('Interview not found.');
   }
 
-  const transcript = await getLatestTranscript(interviewId, preferredProvider);
-  if (!transcript) {
+  const scoringProvider = options.scoringProvider || resolveDefaultScoringProvider();
+  const transcript = await getLatestTranscript(interviewId, options.preferredTranscriptProvider);
+
+  if (scoringProvider === 'openai' && !transcript) {
     throw new Error('No transcript found for analysis.');
   }
 
+  const audioFileUrl =
+    scoringProvider === 'xunfei'
+      ? options.audioFileUrl || resolveInterviewAudioUrl(interview)
+      : undefined;
+
   const result = await scoreTranscript({
+    scoringProvider,
     questionText: interview.questionText || undefined,
     referenceText: interview.referenceText,
-    transcriptText: transcript.text
+    transcriptText: transcript?.text,
+    audioFileUrl
   });
 
-  await saveAnalysis(interviewId, transcript.provider, result.model, result.analysis);
+  await saveAnalysis(interviewId, transcript?.provider || interview.activeTranscriptProvider || 'xunfei', result.model, result.analysis);
   return {
-    transcriptProvider: transcript.provider,
+    transcriptProvider: transcript?.provider || interview.activeTranscriptProvider || null,
+    scoringProvider,
     scoringModel: result.model,
+    audioFileUrl: audioFileUrl || null,
     ...result.analysis
   };
 }
@@ -101,7 +123,7 @@ export async function processInterview(input: CreateInterviewInput & { interview
     throw new Error('Failed to create interview.');
   }
   const transcripts = await transcribeInterview(interview.id, input.providers);
-  const analysis = await analyzeInterview(interview.id, transcripts[0]?.provider);
+  const analysis = await analyzeInterview(interview.id, { preferredTranscriptProvider: transcripts[0]?.provider });
   return getInterviewDetail(interview.id);
 }
 
@@ -121,6 +143,148 @@ export async function getInterviewDetail(interviewId: number): Promise<Interview
   };
 }
 
+export async function segmentInterviewTranscript(interviewId: number, preferredProvider?: TranscriptProviderName) {
+  const transcript = await getLatestTranscript(interviewId, preferredProvider);
+  if (!transcript) {
+    throw new Error('No transcript found for segmentation.');
+  }
+
+  return {
+    provider: transcript.provider,
+    model: transcript.model,
+    ...segmentTranscript({ transcriptText: transcript.text })
+  };
+}
+
 export async function markInterviewFailed(interviewId: number) {
   await updateInterviewStatus(interviewId, 'failed');
+}
+
+export async function queueInterviewTranscription(interviewId: number, providerInput?: unknown) {
+  const interview = await getInterviewById(interviewId);
+  if (!interview) {
+    throw new Error('Interview not found.');
+  }
+  if (!interview.audioPath) {
+    throw new Error('Audio has not been uploaded yet.');
+  }
+
+  const fullAudioPath = resolveStoredAudioPath(interview.audioPath);
+  const providers = await resolveTranscriptionProviders(fullAudioPath, providerInput);
+  const activeProvider = providers[0] || null;
+
+  await updateInterviewStatus(interviewId, 'transcribing', {
+    activeTranscriptProvider: activeProvider,
+    errorMessage: null
+  });
+
+  runJob(`transcribe:${interviewId}`, async () => {
+    try {
+      await transcribeInterview(interviewId, providers);
+    } catch (error) {
+      await updateInterviewStatus(interviewId, 'failed', {
+        activeTranscriptProvider: activeProvider,
+        errorMessage: (error as Error).message
+      });
+    }
+  });
+
+  return {
+    interviewId,
+    status: 'transcribing' as const,
+    providers
+  };
+}
+
+export async function queueInterviewAnalysis(interviewId: number, options: AnalyzeInterviewOptions = {}) {
+  const interview = await getInterviewById(interviewId);
+  if (!interview) {
+    throw new Error('Interview not found.');
+  }
+
+  await updateInterviewStatus(interviewId, 'analyzing', {
+    activeTranscriptProvider: options.preferredTranscriptProvider || interview.activeTranscriptProvider || null,
+    errorMessage: null
+  });
+
+  runJob(`analyze:${interviewId}`, async () => {
+    try {
+      await analyzeInterview(interviewId, options);
+    } catch (error) {
+      await updateInterviewStatus(interviewId, 'failed', {
+        activeTranscriptProvider: options.preferredTranscriptProvider || interview.activeTranscriptProvider || null,
+        errorMessage: (error as Error).message
+      });
+    }
+  });
+
+  return {
+    interviewId,
+    status: 'analyzing' as const,
+    provider: options.preferredTranscriptProvider || interview.activeTranscriptProvider || null,
+    scoringProvider: options.scoringProvider || resolveDefaultScoringProvider(),
+    audioFileUrl: options.audioFileUrl || null
+  };
+}
+
+export async function queueFullInterviewProcessing(interviewId: number, providerInput?: unknown) {
+  const interview = await getInterviewById(interviewId);
+  if (!interview) {
+    throw new Error('Interview not found.');
+  }
+  if (!interview.audioPath) {
+    throw new Error('Audio has not been uploaded yet.');
+  }
+
+  const fullAudioPath = resolveStoredAudioPath(interview.audioPath);
+  const providers = await resolveTranscriptionProviders(fullAudioPath, providerInput);
+  const activeProvider = providers[0] || null;
+
+  await updateInterviewStatus(interviewId, 'transcribing', {
+    activeTranscriptProvider: activeProvider,
+    errorMessage: null
+  });
+
+  runJob(`process:${interviewId}`, async () => {
+    try {
+      const transcripts = await transcribeInterview(interviewId, providers);
+      await updateInterviewStatus(interviewId, 'analyzing', {
+        activeTranscriptProvider: transcripts[0]?.provider || activeProvider,
+        errorMessage: null
+      });
+      await analyzeInterview(interviewId, { preferredTranscriptProvider: transcripts[0]?.provider });
+    } catch (error) {
+      await updateInterviewStatus(interviewId, 'failed', {
+        activeTranscriptProvider: activeProvider,
+        errorMessage: (error as Error).message
+      });
+    }
+  });
+
+  return {
+    interviewId,
+    status: 'transcribing' as const,
+    providers
+  };
+}
+
+function resolveStoredAudioPath(audioPath: string) {
+  return path.isAbsolute(audioPath) ? audioPath : path.join(process.cwd(), audioPath);
+}
+
+function resolveDefaultScoringProvider(): ScoringProviderName {
+  return config.openaiApiKey ? 'openai' : 'xunfei';
+}
+
+function resolveInterviewAudioUrl(interview: InterviewRecord) {
+  if (!interview.audioPath || !config.publicBaseUrl) {
+    return undefined;
+  }
+
+  const normalizedPath = interview.audioPath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
+  if (!normalizedPath) {
+    return undefined;
+  }
+
+  return `${config.publicBaseUrl}/${normalizedPath}`;
 }

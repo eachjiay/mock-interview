@@ -15,6 +15,8 @@ export async function createInterview(input: CreateInterviewInput): Promise<Inte
       audioPath: null,
       audioOriginalName: null,
       status: 'created',
+      activeTranscriptProvider: null,
+      errorMessage: null,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -31,18 +33,32 @@ export async function attachAudio(interviewId: number, audioPath: string, origin
     interview.audioPath = audioPath;
     interview.audioOriginalName = originalName;
     interview.status = 'uploaded';
+    interview.errorMessage = null;
     interview.updatedAt = new Date().toISOString();
   });
   return getInterviewById(interviewId);
 }
 
-export async function updateInterviewStatus(interviewId: number, status: 'created' | 'uploaded' | 'transcribed' | 'analyzed' | 'failed') {
+export async function updateInterviewStatus(
+  interviewId: number,
+  status: 'created' | 'uploaded' | 'transcribing' | 'transcribed' | 'analyzing' | 'analyzed' | 'failed',
+  options?: {
+    activeTranscriptProvider?: InterviewRecord['activeTranscriptProvider'];
+    errorMessage?: string | null;
+  }
+) {
   await writeDB((data) => {
     const interview = data.interviews.find((item) => item.id === interviewId);
     if (!interview) {
       throw new Error('Interview not found.');
     }
     interview.status = status;
+    if (options && 'activeTranscriptProvider' in options) {
+      interview.activeTranscriptProvider = options.activeTranscriptProvider ?? null;
+    }
+    if (options && 'errorMessage' in options) {
+      interview.errorMessage = options.errorMessage ?? null;
+    }
     interview.updatedAt = new Date().toISOString();
   });
 }
@@ -61,6 +77,8 @@ export async function saveTranscript(interviewId: number, transcript: Transcript
       ...transcript
     });
     interview.status = 'transcribed';
+    interview.activeTranscriptProvider = transcript.provider;
+    interview.errorMessage = null;
     interview.updatedAt = new Date().toISOString();
   });
 }
@@ -81,6 +99,7 @@ export async function saveAnalysis(interviewId: number, provider: string, model:
       ...analysis
     });
     interview.status = 'analyzed';
+    interview.errorMessage = null;
     interview.updatedAt = new Date().toISOString();
   });
 }
