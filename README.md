@@ -68,7 +68,7 @@ At minimum, fill:
 
 ```env
 PORT=5050
-PUBLIC_BASE_URL=https://your-domain.com
+PUBLIC_BASE_URL=http://8.216.36.217:5050
 
 OPENAI_API_KEY=your-new-openai-key
 
@@ -84,7 +84,7 @@ XUNFEI_VOICE_INSIGHT_MODEL_CODE=4.0ultra
 
 Notes:
 
-- `PUBLIC_BASE_URL` must be the public domain that can access `https://your-domain.com/uploads/...`
+- `PUBLIC_BASE_URL` must be the public domain that can access `http://8.216.36.217:5050/uploads/...`
 - `voice-insight` analysis needs a public audio URL, so local `localhost` URLs are not enough
 - keep `.env` on the server only, never commit it
 

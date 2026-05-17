@@ -5,7 +5,7 @@ This file shows a practical frontend integration flow for `D:\mock-interview-bac
 Assume the backend runs at:
 
 ```ts
-const BASE_URL = "http://localhost:5050";
+const BASE_URL = "http://8.216.36.217:5050";
 ```
 
 ## 1. Import a document

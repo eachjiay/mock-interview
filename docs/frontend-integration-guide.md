@@ -16,7 +16,7 @@ Recommended production path:
 Base URL example:
 
 ```ts
-const BASE_URL = "http://your-api-host:5050";
+const BASE_URL = "http://8.216.36.217:5050";
 ```
 
 ## 1. Create interview
