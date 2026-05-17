@@ -1,0 +1,14 @@
+services:
+  mock-interview-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mock-interview-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5050}:5050"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads

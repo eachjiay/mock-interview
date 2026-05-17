@@ -37,11 +37,124 @@ Required env:
 
 - `OPENAI_API_KEY`
 - `XUNFEI_APP_ID` and `XUNFEI_API_SECRET` if you want to use Xunfei
+- `PUBLIC_BASE_URL` if you want Xunfei `voice-insight` to fetch uploaded audio files from your server
 
 Recommended defaults:
 
 - `OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`
 - `OPENAI_SCORING_MODEL=gpt-4o-mini`
+
+## Docker deployment
+
+This repo now includes:
+
+- [Dockerfile](D:\mock-interview-backend\Dockerfile)
+- [docker-compose.yml](D:\mock-interview-backend\docker-compose.yml)
+
+### 1. Prepare the server
+
+Install Docker and Docker Compose on your Linux server, then clone the repo:
+
+```bash
+git clone https://github.com/eachjiay/mock-interview.git
+cd mock-interview
+cp .env.example .env
+```
+
+### 2. Configure `.env`
+
+At minimum, fill:
+
+```env
+PORT=5050
+PUBLIC_BASE_URL=https://your-domain.com
+
+OPENAI_API_KEY=your-new-openai-key
+
+XUNFEI_ENABLED=true
+XUNFEI_API_URL=https://office-api-ist-dx.iflyaisol.com
+XUNFEI_APP_ID=your-xunfei-app-id
+XUNFEI_API_KEY=your-xunfei-api-key
+XUNFEI_API_SECRET=your-xunfei-api-secret
+XUNFEI_LANGUAGE=autodialect
+XUNFEI_VOICE_INSIGHT_API_URL=https://spark-openapi.cn-huabei-1.xf-yun.com
+XUNFEI_VOICE_INSIGHT_MODEL_CODE=4.0ultra
+```
+
+Notes:
+
+- `PUBLIC_BASE_URL` must be the public domain that can access `https://your-domain.com/uploads/...`
+- `voice-insight` analysis needs a public audio URL, so local `localhost` URLs are not enough
+- keep `.env` on the server only, never commit it
+
+### 3. Start the service
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Check status
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:5050/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+### 5. Update after new code
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### 6. Persistent data
+
+The compose file already mounts:
+
+- `./data` -> `/app/data`
+- `./uploads` -> `/app/uploads`
+
+So interview records and uploaded audio remain after container restarts.
+
+### 7. Recommended production setup
+
+- Use a real domain such as `api.yourdomain.com`
+- Put Nginx or Caddy in front of port `5050`
+- Enable HTTPS
+- Point `PUBLIC_BASE_URL` to that HTTPS domain
+
+Minimal Nginx reverse proxy example:
+
+```nginx
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+
+    client_max_body_size 200m;
+
+    location / {
+        proxy_pass http://127.0.0.1:5050;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+If your audio files are large, increase `client_max_body_size` accordingly.
 
 ## Document flow
 
