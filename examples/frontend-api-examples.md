@@ -224,6 +224,8 @@ Example response:
 }
 ```
 
+The backend strips provider-specific `raw` payloads from this response so it can be sent straight to the frontend without carrying a huge debug object.
+
 ## 6.1 Clean raw transcript text
 
 Useful when you want to turn raw ASR output into a cleaner version before showing it to the user or sending it into scoring.
@@ -248,6 +250,12 @@ export async function cleanTranscriptText(transcriptText: string, keepParagraphs
   return response.json();
 }
 ```
+
+This response only includes:
+
+- `cleanedText`
+- `removedFillers`
+- `notes`
 
 ## 6.2 Segment transcript into interviewer/candidate blocks
 
@@ -372,6 +380,11 @@ export async function analyzeInterview(interviewId: number, provider = "openai")
   return response.json();
 }
 ```
+
+If `provider` is `openai`, the backend now auto-cleans the latest transcript before scoring. That means the frontend flow can be:
+
+- want to display a polished transcript: call `/api/transcriptions/clean`
+- only want a score: call `/api/interviews/:id/analyze` directly
 
 ### Step D.1: segment the latest interview transcript
 
@@ -519,8 +532,9 @@ Recommended practical flow:
 6. Upload audio
 7. Queue transcription with `providers=["auto"]`
 8. Poll status until `transcribed`
-9. Queue analysis
-10. Poll status until `analyzed`
+9. Optionally call `/api/transcriptions/clean` and show the cleaned text
+10. Queue analysis
+11. Poll status until `analyzed`
 
 If your frontend wants the simplest path:
 

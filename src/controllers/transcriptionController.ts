@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { parseProviderList } from '../services/transcription/index.js';
 import { transcribeAudioFile } from '../services/transcriptionService.js';
+import type { TranscriptResult } from '../types.js';
 
 export async function transcribeAudio(req: Request, res: Response) {
   try {
@@ -16,9 +17,14 @@ export async function transcribeAudio(req: Request, res: Response) {
       fileName: file.originalname,
       storedFileName: file.filename,
       size: file.size,
-      transcripts
+      transcripts: transcripts.map(stripRawFromTranscript)
     });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
+}
+
+function stripRawFromTranscript(transcript: TranscriptResult) {
+  const { raw: _raw, ...rest } = transcript;
+  return rest;
 }

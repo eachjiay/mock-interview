@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../config.js';
+import { cleanTranscript } from './transcriptCleaningService.js';
 import { analyzeAudioWithXunfei } from './xunfeiVoiceInsightService.js';
 import type { AnalysisResult, ScoringProviderName } from '../types.js';
 
@@ -28,6 +29,11 @@ async function scoreWithOpenAI(input: ScoreInput) {
     throw new Error('transcriptText is required for OpenAI scoring.');
   }
 
+  const cleanedTranscript = await cleanTranscript({
+    transcriptText: input.transcriptText,
+    keepParagraphs: true
+  });
+
   const response = await client.responses.create({
     model: config.openaiScoringModel,
     input: [
@@ -48,7 +54,7 @@ async function scoreWithOpenAI(input: ScoreInput) {
             text: JSON.stringify({
               questionText: input.questionText || '',
               referenceText: input.referenceText,
-              answerText: input.transcriptText,
+              answerText: cleanedTranscript.cleanedText,
               outputSchema: {
                 score: 'number 0-100',
                 summary: 'short Chinese summary',
@@ -91,7 +97,10 @@ async function scoreWithOpenAI(input: ScoreInput) {
       strengths: parsed.strengths,
       gaps: parsed.gaps,
       mismatches: parsed.mismatches,
-      raw: response
+      raw: {
+        cleanedTranscript,
+        scoringResponse: response
+      }
     }
   };
 }

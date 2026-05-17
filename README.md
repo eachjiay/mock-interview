@@ -32,6 +32,7 @@ npm run dev
 Frontend integration examples:
 
 - [examples/frontend-api-examples.md](D:\mock-interview-backend\examples\frontend-api-examples.md)
+- [docs/frontend-integration-guide.md](D:\mock-interview-backend\docs\frontend-integration-guide.md)
 
 Required env:
 
@@ -254,6 +255,8 @@ Content-Type: application/json
 }
 ```
 
+When `provider` / `scoringProvider` is `openai`, the backend auto-cleans the latest transcript before scoring. Call `/api/transcriptions/clean` separately only when you also want to show a polished transcript to the user.
+
 ## One-shot flow
 
 ```http
@@ -285,6 +288,8 @@ Form fields:
 - `provider`: optional, single provider such as `openai` or `xunfei`
 - `providers`: optional, comma-separated or repeated values such as `openai,xunfei`
 
+Responses from this endpoint omit provider-specific `raw` payloads by default so the frontend receives a smaller JSON body.
+
 ## Transcript cleaning flow
 
 ```http
@@ -306,6 +311,8 @@ Response fields:
 - `cleanedText`: cleaned transcript text
 - `removedFillers`: filler words removed or normalized
 - `notes`: cleanup notes such as obvious ASR noise fixes
+
+This endpoint returns only display-friendly fields and does not expose the underlying model `raw` response by default.
 
 ## Transcript segmentation flow
 

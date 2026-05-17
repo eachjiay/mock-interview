@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { cleanTranscript } from '../services/transcriptCleaningService.js';
+import type { TranscriptCleanResult } from '../types.js';
 
 export async function cleanTranscriptText(req: Request, res: Response) {
   try {
@@ -13,8 +14,13 @@ export async function cleanTranscriptText(req: Request, res: Response) {
       keepParagraphs: keepParagraphs !== false
     });
 
-    res.json(result);
+    res.json(stripRawFromCleanResult(result));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
+}
+
+function stripRawFromCleanResult(result: TranscriptCleanResult) {
+  const { raw: _raw, ...rest } = result;
+  return rest;
 }

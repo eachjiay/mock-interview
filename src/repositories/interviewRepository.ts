@@ -136,5 +136,6 @@ export async function getLatestAnalysis(interviewId: number): Promise<StoredAnal
   if (!latest) {
     return null;
   }
-  return latest as StoredAnalysis;
+  const { raw: _raw, ...rest } = latest;
+  return rest as StoredAnalysis;
 }
