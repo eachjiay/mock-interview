@@ -37,6 +37,7 @@ Frontend integration examples:
 
 - [examples/frontend-api-examples.md](D:\mock-interview-backend\examples\frontend-api-examples.md)
 - [docs/frontend-integration-guide.md](D:\mock-interview-backend\docs\frontend-integration-guide.md)
+- [docs/frontend-question-page-guide.md](D:\mock-interview-backend\docs\frontend-question-page-guide.md)
 
 Required env:
 
