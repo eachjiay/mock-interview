@@ -9,6 +9,10 @@ Standalone backend for AI mock interviews. It can import interview documents int
 - `GET /api/documents` list imported documents
 - `GET /api/documents/:id` get one document and its extracted questions
 - `GET /api/documents/:id/questions/random?count=3` sample random questions from one document
+- `GET /api/questions/:id/media` get the fixed media asset for one question
+- `PUT /api/questions/:id/media` manually bind an existing audio/image/video asset to one question
+- `POST /api/questions/:id/media/generate` queue fixed-question media generation
+- `POST /api/questions/media/generate-batch` queue media generation for a whole document
 - `POST /api/transcriptions` upload an audio file and transcribe it directly with `openai` or `xunfei`
 - `POST /api/transcriptions/clean` clean raw ASR transcript text for display and downstream scoring
 - `POST /api/transcriptions/segment` split transcript text into interviewer/candidate-like segments and Q/A pairs
@@ -39,11 +43,14 @@ Required env:
 - `OPENAI_API_KEY`
 - `XUNFEI_APP_ID` and `XUNFEI_API_SECRET` if you want to use Xunfei
 - `PUBLIC_BASE_URL` if you want Xunfei `voice-insight` to fetch uploaded audio files from your server
+- OSS credentials if you want generated question audio to upload automatically to OSS
 
 Recommended defaults:
 
 - `OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`
 - `OPENAI_SCORING_MODEL=gpt-4o-mini`
+- `OPENAI_TTS_MODEL=gpt-4o-mini-tts`
+- `OPENAI_TTS_VOICE=cedar`
 
 ## Docker deployment
 
@@ -70,6 +77,16 @@ At minimum, fill:
 PORT=5050
 PUBLIC_BASE_URL=http://8.216.36.217:5050
 
+OSS_ENABLED=true
+OSS_REGION=oss-cn-hangzhou
+OSS_BUCKET=your-bucket-name
+OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+OSS_ACCESS_KEY_ID=your-ram-access-key-id
+OSS_ACCESS_KEY_SECRET=your-ram-access-key-secret
+OSS_PREFIX=mock-interview
+OSS_PUBLIC_BASE_URL=https://your-cdn-or-bucket-domain
+OSS_SECURE=true
+
 OPENAI_API_KEY=your-new-openai-key
 
 XUNFEI_ENABLED=true
@@ -86,6 +103,7 @@ Notes:
 
 - `PUBLIC_BASE_URL` must be the public domain that can access `http://8.216.36.217:5050/uploads/...`
 - `voice-insight` analysis needs a public audio URL, so local `localhost` URLs are not enough
+- if OSS is enabled, generated question audio is uploaded to your bucket with the SDK `put` flow
 - keep `.env` on the server only, never commit it
 
 ### 3. Start the service
@@ -186,6 +204,65 @@ Content-Type: application/json
 
 ```http
 GET /api/documents/1/questions/random?count=3
+```
+
+Question records returned by document detail and random sampling now include `mediaAsset`, so the frontend can directly read fixed preview resources:
+
+```json
+{
+  "id": 12,
+  "prompt": "请介绍一下你做过的项目",
+  "mediaAsset": {
+    "status": "ready",
+    "audioUrl": "https://cdn.example.com/mock-interview/question-media/question-12.mp3",
+    "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+    "videoUrl": null
+  }
+}
+```
+
+## Question media flow
+
+Use this flow when interviewer prompts are fixed and you want to pre-generate audio and bind fixed visual assets.
+
+Single-question generation:
+
+```http
+POST /api/questions/12/media/generate
+Content-Type: application/json
+
+{
+  "voice": "cedar",
+  "avatarName": "default-interviewer",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+  "force": false
+}
+```
+
+Batch generation for one whole document:
+
+```http
+POST /api/questions/media/generate-batch
+Content-Type: application/json
+
+{
+  "documentId": 1,
+  "voice": "cedar",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png"
+}
+```
+
+Manual OSS binding:
+
+```http
+PUT /api/questions/12/media
+Content-Type: application/json
+
+{
+  "audioUrl": "https://cdn.example.com/mock-interview/question-media/question-12.mp3",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+  "videoUrl": "https://cdn.example.com/mock-interview/question-media/question-12.mp4"
+}
 ```
 
 ## Interview flow
@@ -346,3 +423,61 @@ Response fields:
   - [GPT-4o mini Transcribe](https://platform.openai.com/docs/models/gpt-4o-mini-transcribe)
 - Xunfei uses the official long-form ASR REST flow: `prepare -> upload -> merge -> getProgress -> getResult`:
   - [讯飞语音转写 API](https://www.xfyun.cn/doc/asr/lfasr/API.html)
+
+## Question media flow
+
+This project now supports fixed interviewer media assets per question.
+
+What it adds:
+
+- `GET /api/questions/:id/media` query the media asset attached to one question
+- `PUT /api/questions/:id/media` manually bind existing `audioUrl`, `imageUrl`, or `videoUrl`
+- `POST /api/questions/:id/media/generate` queue fixed-question audio generation and media binding
+- `POST /api/questions/media/generate-batch` queue generation for every question in a document or for an explicit question list
+
+Current implementation behavior:
+
+- fixed question audio is generated with OpenAI TTS
+- generated audio is stored under `uploads/question-media`
+- public playback URLs are built from `PUBLIC_BASE_URL`
+- fixed interviewer image and video can be bound directly now, and later replaced with OSS URLs
+- question lists returned by document detail and random question sampling now include `mediaAsset`
+
+Useful env variables:
+
+```env
+QUESTION_MEDIA_DIR=./uploads/question-media
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_VOICE=cedar
+OPENAI_TTS_INSTRUCTIONS=Speak clearly and naturally in Mandarin Chinese for a mock interview prompt.
+DEFAULT_QUESTION_IMAGE_URL=
+DEFAULT_QUESTION_VIDEO_URL=
+```
+
+Example single-question generation request:
+
+```http
+POST /api/questions/12/media/generate
+Content-Type: application/json
+
+{
+  "voice": "cedar",
+  "avatarName": "default-interviewer",
+  "imageUrl": "https://oss.example.com/mock-interview/interviewer.png",
+  "force": false
+}
+```
+
+Example batch generation request:
+
+```http
+POST /api/questions/media/generate-batch
+Content-Type: application/json
+
+{
+  "documentId": 1,
+  "voice": "cedar",
+  "imageUrl": "https://oss.example.com/mock-interview/interviewer.png"
+}
+```
+

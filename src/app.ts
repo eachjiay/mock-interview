@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config.js';
 import documentRoutes from './routes/documentRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
+import questionRoutes from './routes/questionRoutes.js';
 import transcriptionRoutes from './routes/transcriptionRoutes.js';
 
 const app = express();
@@ -16,6 +17,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/documents', documentRoutes);
+app.use('/api/questions', questionRoutes);
 app.use('/api/transcriptions', transcriptionRoutes);
 app.use('/api/interviews', interviewRoutes);
 

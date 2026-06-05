@@ -1,7 +1,15 @@
 import fs from 'node:fs/promises';
 import { config } from '../config.js';
 import { ensureParentDir } from '../utils/fs.js';
-import type { AnalysisResult, CreateInterviewInput, DocumentRecord, InterviewStatus, QuestionRecord, TranscriptResult } from '../types.js';
+import type {
+  AnalysisResult,
+  CreateInterviewInput,
+  DocumentRecord,
+  InterviewStatus,
+  QuestionMediaAssetRecord,
+  QuestionRecord,
+  TranscriptResult
+} from '../types.js';
 
 interface InterviewRow extends CreateInterviewInput {
   id: number;
@@ -32,12 +40,14 @@ interface DatabaseShape {
   counters: {
     documents: number;
     questions: number;
+    questionMediaAssets: number;
     interviews: number;
     transcripts: number;
     analyses: number;
   };
   documents: DocumentRecord[];
   questions: QuestionRecord[];
+  questionMediaAssets: QuestionMediaAssetRecord[];
   interviews: InterviewRow[];
   transcripts: TranscriptRow[];
   analyses: AnalysisRow[];
@@ -47,12 +57,14 @@ const initialState: DatabaseShape = {
   counters: {
     documents: 0,
     questions: 0,
+    questionMediaAssets: 0,
     interviews: 0,
     transcripts: 0,
     analyses: 0
   },
   documents: [],
   questions: [],
+  questionMediaAssets: [],
   interviews: [],
   transcripts: [],
   analyses: []
@@ -88,12 +100,14 @@ function normalizeDB(data: Partial<DatabaseShape>): DatabaseShape {
     counters: {
       documents: data.counters?.documents || 0,
       questions: data.counters?.questions || 0,
+      questionMediaAssets: data.counters?.questionMediaAssets || 0,
       interviews: data.counters?.interviews || 0,
       transcripts: data.counters?.transcripts || 0,
       analyses: data.counters?.analyses || 0
     },
     documents: data.documents || [],
     questions: data.questions || [],
+    questionMediaAssets: data.questionMediaAssets || [],
     interviews: data.interviews || [],
     transcripts: data.transcripts || [],
     analyses: data.analyses || []

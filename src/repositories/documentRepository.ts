@@ -47,7 +47,9 @@ export async function updateDocumentQuestionCount(documentId: number, count: num
 
 export async function replaceQuestions(documentId: number, questions: Array<Omit<QuestionRecord, 'id' | 'createdAt' | 'documentId'>>) {
   await writeDB((data) => {
+    const previousQuestionIds = data.questions.filter((item) => item.documentId === documentId).map((item) => item.id);
     data.questions = data.questions.filter((item) => item.documentId !== documentId);
+    data.questionMediaAssets = data.questionMediaAssets.filter((item) => !previousQuestionIds.includes(item.questionId));
     for (const question of questions) {
       const id = ++data.counters.questions;
       data.questions.push({

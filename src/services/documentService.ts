@@ -8,6 +8,7 @@ import {
   listQuestionsByDocumentId,
   replaceQuestions
 } from '../repositories/documentRepository.js';
+import { listQuestionMediaAssetsByQuestionIds } from '../repositories/questionMediaRepository.js';
 import { parseDocumentText, extractQuestionsFromText } from './documentParserService.js';
 
 export async function importDocumentFromUpload(filePath: string, originalName: string, title?: string) {
@@ -48,7 +49,7 @@ export async function getDocumentDetail(documentId: number) {
   }
   return {
     document,
-    questions
+    questions: await withQuestionMediaAssets(questions)
   };
 }
 
@@ -68,5 +69,20 @@ export async function listDocumentSummaries() {
 }
 
 export async function getRandomQuestionsForDocument(documentId: number, count: number) {
-  return getRandomQuestions(documentId, count);
+  const questions = await getRandomQuestions(documentId, count);
+  return withQuestionMediaAssets(questions);
+}
+
+async function withQuestionMediaAssets<T extends { id: number }>(questions: T[]) {
+  if (!questions.length) {
+    return [] as Array<T & { mediaAsset: null }>;
+  }
+
+  const assets = await listQuestionMediaAssetsByQuestionIds(questions.map((item) => item.id));
+  const assetMap = new Map(assets.map((item) => [item.questionId, item]));
+
+  return questions.map((question) => ({
+    ...question,
+    mediaAsset: assetMap.get(question.id) || null
+  }));
 }

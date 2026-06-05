@@ -51,6 +51,32 @@ export interface QuestionRecord {
   createdAt: string;
 }
 
+export type QuestionMediaStatus = 'missing' | 'queued' | 'generating' | 'ready' | 'failed';
+
+export interface QuestionMediaAssetRecord {
+  id: number;
+  questionId: number;
+  status: QuestionMediaStatus;
+  sourceText: string;
+  audioUrl?: string | null;
+  audioPath?: string | null;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  voiceProvider?: string | null;
+  imageProvider?: string | null;
+  videoProvider?: string | null;
+  voice?: string | null;
+  avatarName?: string | null;
+  instructions?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuestionWithMediaRecord extends QuestionRecord {
+  mediaAsset: QuestionMediaAssetRecord | null;
+}
+
 export interface TranscriptResult {
   provider: TranscriptProviderName;
   model: string;

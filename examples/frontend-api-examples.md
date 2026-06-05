@@ -542,3 +542,142 @@ If your frontend wants the simplest path:
 2. Pick a random question
 3. Call `POST /api/interviews/process`
 4. Poll `GET /api/interviews/:id` until the score is ready
+
+## 10. Fixed question media examples
+
+### Queue media generation for one question
+
+```ts
+export async function generateQuestionMedia(questionId: number, payload?: {
+  voice?: string;
+  avatarName?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  force?: boolean;
+}) {
+  const response = await fetch(`${BASE_URL}/api/questions/${questionId}/media/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+### Queue media generation for all questions in one document
+
+```ts
+export async function generateDocumentQuestionMedia(documentId: number, imageUrl?: string) {
+  const response = await fetch(`${BASE_URL}/api/questions/media/generate-batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      documentId,
+      voice: "cedar",
+      imageUrl
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+### Read media asset from question list
+
+Question records returned by `GET /api/documents/:id` and `GET /api/documents/:id/questions/random` now include:
+
+```json
+{
+  "id": 12,
+  "prompt": "请介绍一下你做过的项目",
+  "mediaAsset": {
+    "status": "ready",
+    "audioUrl": "http://8.216.36.217:5050/uploads/question-media/question-12.mp3",
+    "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+    "videoUrl": null
+  }
+}
+```
+
+## 10. Fixed question media examples
+
+### Queue media generation for one question
+
+```ts
+export async function generateQuestionMedia(questionId: number, payload?: {
+  voice?: string;
+  avatarName?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  force?: boolean;
+}) {
+  const response = await fetch(`${BASE_URL}/api/questions/${questionId}/media/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload || {})
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+### Queue media generation for all questions in one document
+
+```ts
+export async function generateDocumentQuestionMedia(documentId: number, imageUrl?: string) {
+  const response = await fetch(`${BASE_URL}/api/questions/media/generate-batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      documentId,
+      voice: "cedar",
+      imageUrl
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
+}
+```
+
+### Read media asset from question list
+
+Question records returned by `GET /api/documents/:id` and `GET /api/documents/:id/questions/random` now include:
+
+```json
+{
+  "id": 12,
+  "prompt": "???????????",
+  "mediaAsset": {
+    "status": "ready",
+    "audioUrl": "http://8.216.36.217:5050/uploads/question-media/question-12.mp3",
+    "imageUrl": "https://oss.example.com/mock-interview/interviewer.png",
+    "videoUrl": null
+  }
+}
+```
+

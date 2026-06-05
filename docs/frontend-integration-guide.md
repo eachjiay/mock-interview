@@ -404,3 +404,134 @@ Common cases:
 - OpenAI quota issue
 - unsupported region for OpenAI
 - network timeout
+
+## 13. Fixed question media flow
+
+The backend now supports pre-generated question media for a fixed interviewer avatar experience.
+
+Recommended frontend behavior:
+
+1. After importing a document, call `POST /api/questions/media/generate-batch` once for that document.
+2. When fetching question lists, read `question.mediaAsset` directly from the returned question records.
+3. If `mediaAsset.status === "ready"`, render:
+   - `mediaAsset.imageUrl` or `mediaAsset.videoUrl`
+   - `mediaAsset.audioUrl`
+4. If `mediaAsset.status` is `missing`, `queued`, or `generating`, show a fallback static avatar and disable the preview player.
+
+### Generate media for one question
+
+```http
+POST /api/questions/:id/media/generate
+Content-Type: application/json
+```
+
+```json
+{
+  "voice": "cedar",
+  "avatarName": "default-interviewer",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+  "force": false
+}
+```
+
+### Generate media for a whole document
+
+```http
+POST /api/questions/media/generate-batch
+Content-Type: application/json
+```
+
+```json
+{
+  "documentId": 1,
+  "voice": "cedar",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png"
+}
+```
+
+### Query one question media asset
+
+```http
+GET /api/questions/:id/media
+```
+
+### Manual OSS binding
+
+```http
+PUT /api/questions/:id/media
+Content-Type: application/json
+```
+
+```json
+{
+  "audioUrl": "https://cdn.example.com/mock-interview/question-media/question-12.mp3",
+  "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
+  "videoUrl": "https://cdn.example.com/mock-interview/question-media/question-12.mp4"
+}
+```
+
+## 13. Fixed question media flow
+
+The backend now supports pre-generated question media for the interviewer avatar experience.
+
+Recommended frontend behavior:
+
+1. After importing a document, call `POST /api/questions/media/generate-batch` once for that document.
+2. When fetching question lists, read `question.mediaAsset` directly from the returned question records.
+3. If `mediaAsset.status === "ready"`, render:
+   - `mediaAsset.imageUrl` or `mediaAsset.videoUrl`
+   - `mediaAsset.audioUrl`
+4. If `mediaAsset.status` is `missing`, `queued`, or `generating`, show a fallback static avatar and disable the preview player.
+
+### Generate media for one question
+
+```http
+POST /api/questions/:id/media/generate
+Content-Type: application/json
+```
+
+```json
+{
+  "voice": "cedar",
+  "avatarName": "default-interviewer",
+  "imageUrl": "https://oss.example.com/mock-interview/interviewer.png",
+  "force": false
+}
+```
+
+### Generate media for a whole document
+
+```http
+POST /api/questions/media/generate-batch
+Content-Type: application/json
+```
+
+```json
+{
+  "documentId": 1,
+  "voice": "cedar",
+  "imageUrl": "https://oss.example.com/mock-interview/interviewer.png"
+}
+```
+
+### Query one question media asset
+
+```http
+GET /api/questions/:id/media
+```
+
+### Manual OSS binding
+
+```http
+PUT /api/questions/:id/media
+Content-Type: application/json
+```
+
+```json
+{
+  "audioUrl": "https://oss.example.com/mock-interview/q12.mp3",
+  "imageUrl": "https://oss.example.com/mock-interview/interviewer.png",
+  "videoUrl": "https://oss.example.com/mock-interview/q12.mp4"
+}
+```
+
