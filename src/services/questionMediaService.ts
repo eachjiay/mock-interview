@@ -8,6 +8,7 @@ import type { QuestionMediaAssetRecord } from '../types.js';
 import { runJob } from './jobRunnerService.js';
 import { ensureParentDir } from '../utils/fs.js';
 import { isOssConfigured, uploadBufferToOss } from './ossStorageService.js';
+import { generateAvatarVideo } from './avatarVideoService.js';
 
 const client = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
@@ -166,7 +167,18 @@ async function generateQuestionMedia(questionId: number, input: QueueQuestionMed
 
   const audio = await ensureQuestionAudio(questionId, question.prompt, voice, instructions, input.force || false, existing);
   const imageUrl = input.imageUrl ?? existing?.imageUrl ?? (config.defaultQuestionImageUrl || null);
-  const videoUrl = input.videoUrl ?? existing?.videoUrl ?? (config.defaultQuestionVideoUrl || null);
+  let videoUrl = input.videoUrl ?? existing?.videoUrl ?? (config.defaultQuestionVideoUrl || null);
+  let videoProvider = videoUrl ? inferVisualProvider(input.videoUrl, existing?.videoUrl, config.defaultQuestionVideoUrl) : null;
+
+  if (config.didApiKey && imageUrl && audio.audioUrl && (!videoUrl || input.force)) {
+    try {
+      const videoResult = await generateAvatarVideo(questionId, imageUrl, audio.audioUrl);
+      videoUrl = videoResult.videoUrl;
+      videoProvider = videoResult.provider;
+    } catch (e) {
+      console.error(`Failed to generate avatar video for question ${questionId}:`, e);
+    }
+  }
 
   await saveQuestionMediaAsset(questionId, {
     status: 'ready',
@@ -177,7 +189,7 @@ async function generateQuestionMedia(questionId: number, input: QueueQuestionMed
     videoUrl,
     voiceProvider: 'openai-tts',
     imageProvider: imageUrl ? inferVisualProvider(input.imageUrl, existing?.imageUrl, config.defaultQuestionImageUrl) : null,
-    videoProvider: videoUrl ? inferVisualProvider(input.videoUrl, existing?.videoUrl, config.defaultQuestionVideoUrl) : null,
+    videoProvider,
     voice,
     avatarName,
     instructions,

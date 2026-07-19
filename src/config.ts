@@ -43,6 +43,9 @@ export const config = {
   xunfeiApiUrl: process.env.XUNFEI_API_URL || 'https://office-api-ist-dx.iflyaisol.com',
   xunfeiAppId: process.env.XUNFEI_APP_ID || '',
   xunfeiApiKey: process.env.XUNFEI_API_KEY || '',
+  xunfeiApiUrl: process.env.XUNFEI_API_URL || 'https://office-api-ist-dx.iflyaisol.com',
+  xunfeiAppId: process.env.XUNFEI_APP_ID || '',
+  xunfeiApiKey: process.env.XUNFEI_API_KEY || '',
   xunfeiApiSecret: process.env.XUNFEI_API_SECRET || '',
   xunfeiLanguage: process.env.XUNFEI_LANGUAGE || 'autodialect',
   xunfeiPollIntervalMs: Number(process.env.XUNFEI_POLL_INTERVAL_MS || 5000),
@@ -52,5 +55,6 @@ export const config = {
   volcengineEnabled: process.env.VOLCENGINE_ENABLED === 'true',
   volcengineApiUrl: process.env.VOLCENGINE_API_URL || '',
   volcengineAccessKey: process.env.VOLCENGINE_ACCESS_KEY || '',
-  volcengineSecretKey: process.env.VOLCENGINE_SECRET_KEY || ''
+  volcengineSecretKey: process.env.VOLCENGINE_SECRET_KEY || '',
+  didApiKey: process.env.DID_API_KEY || ''
 };
