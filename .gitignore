@@ -6,3 +6,8 @@ uploads
 .idea
 
 test-data
+
+# Local deployment credentials and runtime output
+/.codex-repair-ed25519
+/.codex-repair-ed25519.pub
+/server.log

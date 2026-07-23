@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import {
   getQuestionMediaDetail,
+  getQuestionMediaGenerationStatus,
   queueBatchQuestionMediaGeneration,
   queueQuestionMediaGeneration,
   upsertQuestionMedia
@@ -79,6 +80,18 @@ export async function generateQuestionMediaBatch(req: Request, res: Response) {
     });
 
     res.status(202).json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+}
+
+export async function getQuestionMediaBatchStatus(req: Request, res: Response) {
+  try {
+    const documentId = Number(req.query.documentId);
+    const result = await getQuestionMediaGenerationStatus({
+      documentId: Number.isInteger(documentId) && documentId > 0 ? documentId : undefined
+    });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

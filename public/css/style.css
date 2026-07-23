@@ -199,6 +199,21 @@ button {
     border-radius: 19px; /* slightly less than parent to fit inside border */
 }
 
+.interviewer-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 19px;
+}
+
+.question-audio {
+    position: absolute;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    width: calc(100% - 2rem);
+}
+
 .placeholder {
     position: absolute;
     display: flex;
@@ -326,6 +341,33 @@ button {
     display: block;
     margin-bottom: 0.5rem;
     font-size: 0.85rem;
+}
+
+.text-content {
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
+
+.analysis-section {
+    margin-top: 1rem;
+}
+
+.analysis-section h4 {
+    margin-bottom: 0.5rem;
+}
+
+.analysis-text,
+.result-list {
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.result-list {
+    padding-left: 1.25rem;
+}
+
+.retry-result-btn {
+    margin-top: 1rem;
 }
 
 @media (max-width: 768px) {

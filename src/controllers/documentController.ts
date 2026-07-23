@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { getDocumentDetail, getRandomQuestionsForDocument, importDocumentFromLocal, importDocumentFromUpload, listDocumentSummaries } from '../services/documentService.js';
+import { config } from '../config.js';
 
 function toDocumentId(value: string | string[] | undefined) {
   if (!value || Array.isArray(value)) {
@@ -28,6 +29,9 @@ export async function uploadDocument(req: Request, res: Response) {
 
 export async function importDocumentByLocalPath(req: Request, res: Response) {
   try {
+    if (!config.allowLocalImport) {
+      return res.status(403).json({ error: 'Local document import is disabled.' });
+    }
     const { filePath, title } = req.body;
     if (!filePath || typeof filePath !== 'string') {
       return res.status(400).json({ error: 'filePath is required.' });
@@ -64,7 +68,10 @@ export async function getDocument(req: Request, res: Response) {
 export async function getRandomQuestions(req: Request, res: Response) {
   try {
     const documentId = toDocumentId(req.params.id);
-    const count = Math.max(1, Math.min(Number(req.query.count || 1), 20));
+    const requestedCount = Number(req.query.count || 1);
+    const count = Number.isFinite(requestedCount)
+      ? Math.max(1, Math.min(requestedCount, 20))
+      : 1;
     const questions = await getRandomQuestionsForDocument(documentId, count);
     res.json({ questions });
   } catch (error) {

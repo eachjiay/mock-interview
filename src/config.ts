@@ -14,11 +14,20 @@ function normalizeBaseUrl(value: string | undefined) {
 }
 
 export const config = {
+  nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 5050),
   dbPath: resolvePath(process.env.DB_PATH, './data/app.json'),
   uploadDir: resolvePath(process.env.UPLOAD_DIR, './uploads'),
   questionMediaDir: resolvePath(process.env.QUESTION_MEDIA_DIR, './uploads/question-media'),
   maxAudioFileMb: Number(process.env.MAX_AUDIO_FILE_MB || 100),
+  adminApiToken: process.env.ADMIN_API_TOKEN || '',
+  allowLocalImport: process.env.ALLOW_LOCAL_IMPORT === 'true' || process.env.NODE_ENV !== 'production',
+  apiRateLimitWindowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000),
+  apiRateLimitMax: Number(process.env.API_RATE_LIMIT_MAX || 120),
+  paidApiRateLimitMax: Number(process.env.PAID_API_RATE_LIMIT_MAX || 20),
+  questionMediaBatchConcurrency: Math.max(1, Number(process.env.QUESTION_MEDIA_BATCH_CONCURRENCY || 1)),
+  questionMediaPreflightTimeoutMs: Math.max(1000, Number(process.env.QUESTION_MEDIA_PREFLIGHT_TIMEOUT_MS || 30000)),
+  questionMediaAutoGenerateAll: process.env.QUESTION_MEDIA_AUTO_GENERATE_ALL === 'true',
   publicBaseUrl: normalizeBaseUrl(process.env.PUBLIC_BASE_URL),
   ossEnabled: process.env.OSS_ENABLED === 'true',
   ossRegion: process.env.OSS_REGION || '',
@@ -33,9 +42,10 @@ export const config = {
   openaiTranscriptionModel: process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
   openaiScoringModel: process.env.OPENAI_SCORING_MODEL || 'gpt-4o-mini',
   openaiTtsModel: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-  openaiTtsVoice: process.env.OPENAI_TTS_VOICE || 'cedar',
+  openaiTtsVoice: process.env.OPENAI_TTS_VOICE || 'marin',
   openaiTtsInstructions:
-    process.env.OPENAI_TTS_INSTRUCTIONS || 'Speak clearly and naturally in Mandarin Chinese for a mock interview prompt.',
+    process.env.OPENAI_TTS_INSTRUCTIONS ||
+    'Speak in natural Mandarin Chinese using a warm, professional adult female voice. Sound calm, confident, and attentive, like an experienced interviewer. Use a moderate pace and clear pronunciation. Ask the question directly without adding or omitting content.',
   openaiMaxUploadMb: Number(process.env.OPENAI_MAX_UPLOAD_MB || 25),
   defaultQuestionImageUrl: normalizeBaseUrl(process.env.DEFAULT_QUESTION_IMAGE_URL),
   defaultQuestionVideoUrl: normalizeBaseUrl(process.env.DEFAULT_QUESTION_VIDEO_URL),

@@ -84,6 +84,11 @@ export async function listQuestionsByDocumentId(documentId: number): Promise<Que
   return data.questions.filter((item) => item.documentId === documentId);
 }
 
+export async function listAllQuestions(): Promise<QuestionRecord[]> {
+  const data = await readDB();
+  return [...data.questions];
+}
+
 export async function getQuestionById(questionId: number): Promise<QuestionRecord | null> {
   const data = await readDB();
   return data.questions.find((item) => item.id === questionId) || null;

@@ -3,9 +3,13 @@ import path from 'node:path';
 import mammoth from 'mammoth';
 import type { QuestionRecord } from '../types.js';
 
-const questionLinePattern = /[？?：:]$/;
+const questionLinePattern = /[？?]$/;
+const promptLeadPattern = /^(问题|题目|面试题|Q|Question)\s*[:：]/i;
 const answerLeadPattern = /^(答|回答|参考答案|解析|说明)[:：]\s*/;
 const metaPromptPattern = /(辅助记忆|流程记忆方式|备注|思路总结|贡献如下|总结如下)/;
+const questionCuePattern = /(怎么|如何|为什么|什么|说说|讲讲|介绍|区别|原理|流程|设计|实现|怎么办|是否|能不能|有没有|哪些|几种|多少|吗|呢)/;
+const sectionHeadingPattern = /^(Java|JVM|MySQL|Mysql|Redis|Spring|SpringBoot|Spring Cloud|MQ|RabbitMQ|RocketMQ|Kafka|Linux|Nginx|Docker|Kubernetes|K8s|Netty|ElasticSearch|Elasticsearch|ES|操作系统|计算机网络|数据库|多线程|并发|分布式|微服务|项目|算法|数据结构|设计模式|场景题)$/i;
+const memoryBulletPattern = /^[0-9一二三四五六七八九十]+[.、)]\s*\S.{0,80}$/;
 
 export async function parseDocumentText(filePath: string) {
   const extension = path.extname(filePath).toLowerCase();
@@ -26,12 +30,13 @@ export function extractQuestionsFromText(text: string): Array<Omit<QuestionRecor
   const questions: Array<Omit<QuestionRecord, 'id' | 'createdAt' | 'documentId'>> = [];
   let currentPrompt = '';
   let answerLines: string[] = [];
+  let skippingMemoryBlock = false;
 
   const pushCurrent = () => {
-    if (!currentPrompt || answerLines.length === 0) {
+    const referenceAnswer = cleanReferenceAnswer(answerLines);
+    if (!currentPrompt || !referenceAnswer) {
       return;
     }
-    const referenceAnswer = answerLines.join('\n').trim();
     questions.push({
       prompt: currentPrompt.trim(),
       referenceAnswer,
@@ -40,16 +45,37 @@ export function extractQuestionsFromText(text: string): Array<Omit<QuestionRecor
   };
 
   for (const line of lines) {
-    const cleanedLine = line.replace(answerLeadPattern, '').trim();
     const looksLikeQuestion = isQuestionLine(line);
     if (looksLikeQuestion) {
       pushCurrent();
       currentPrompt = normalizePrompt(line);
       answerLines = [];
+      skippingMemoryBlock = false;
       continue;
     }
 
     if (!currentPrompt) {
+      continue;
+    }
+
+    if (isMetaLine(line)) {
+      skippingMemoryBlock = true;
+      continue;
+    }
+
+    if (skippingMemoryBlock) {
+      if (isLikelyMemoryBullet(line)) {
+        continue;
+      }
+      skippingMemoryBlock = false;
+    }
+
+    if (isSectionHeading(line)) {
+      continue;
+    }
+
+    const cleanedLine = line.replace(answerLeadPattern, '').trim();
+    if (!cleanedLine) {
       continue;
     }
 
@@ -86,17 +112,26 @@ function isQuestionLine(line: string) {
   if (!trimmed) {
     return false;
   }
-  if (metaPromptPattern.test(trimmed)) {
+  if (isMetaLine(trimmed) || isSectionHeading(trimmed)) {
     return false;
   }
-  if (trimmed.length <= 4 && !questionLinePattern.test(trimmed)) {
+  if (promptLeadPattern.test(trimmed)) {
+    return true;
+  }
+  if (questionLinePattern.test(trimmed)) {
+    return true;
+  }
+  if (trimmed.length <= 4 || trimmed.length > 80) {
     return false;
   }
-  return questionLinePattern.test(trimmed) || trimmed.includes('怎么') || trimmed.includes('如何') || trimmed.includes('为什么') || trimmed.includes('什么') || trimmed.includes('说说');
+  return questionCuePattern.test(trimmed);
 }
 
 function normalizePrompt(value: string) {
-  return value.replace(/^[0-9一二三四五六七八九十]+[.、)\s]*/, '').trim();
+  return value
+    .replace(promptLeadPattern, '')
+    .replace(/^[0-9一二三四五六七八九十]+[.、)\s]*/, '')
+    .trim();
 }
 
 function normalizeText(value: string) {
@@ -115,4 +150,35 @@ function extractKeywords(text: string) {
     .map((item) => item.trim())
     .filter((item) => item.length >= 2)
     .slice(0, 8);
+}
+
+function cleanReferenceAnswer(lines: string[]) {
+  const cleaned: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || isMetaLine(trimmed) || isSectionHeading(trimmed)) {
+      continue;
+    }
+    cleaned.push(trimmed);
+  }
+
+  while (cleaned.length && (isSectionHeading(cleaned[cleaned.length - 1] || '') || isMetaLine(cleaned[cleaned.length - 1] || ''))) {
+    cleaned.pop();
+  }
+
+  return cleaned.join('\n').trim();
+}
+
+function isMetaLine(line: string) {
+  return metaPromptPattern.test(line.trim());
+}
+
+function isSectionHeading(line: string) {
+  const trimmed = line.trim().replace(/[：:]\s*$/, '');
+  return sectionHeadingPattern.test(trimmed);
+}
+
+function isLikelyMemoryBullet(line: string) {
+  const trimmed = line.trim();
+  return memoryBulletPattern.test(trimmed) || trimmed.length <= 30;
 }

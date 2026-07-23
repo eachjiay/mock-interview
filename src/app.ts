@@ -6,6 +6,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import transcriptionRoutes from './routes/transcriptionRoutes.js';
+import { createRateLimiter } from './middleware/security.js';
 
 const app = express();
 
@@ -13,6 +14,10 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use('/uploads', express.static(config.uploadDir));
 app.use(express.static(path.join(process.cwd(), 'public')));
+app.use('/api', createRateLimiter({
+  label: 'api',
+  max: config.apiRateLimitMax
+}));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

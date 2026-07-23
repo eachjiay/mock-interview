@@ -87,12 +87,35 @@ export async function readDB() {
 }
 
 export async function writeDB(updater: (data: DatabaseShape) => void | DatabaseShape) {
-  writeChain = writeChain.then(async () => {
+  const nextWrite = writeChain.catch(() => undefined).then(async () => {
     const data = await readDB();
     const next = (updater(data) || data) as DatabaseShape;
-    await fs.writeFile(config.dbPath, JSON.stringify(next, null, 2), 'utf8');
+    await atomicWriteJson(config.dbPath, next);
   });
-  await writeChain;
+  writeChain = nextWrite;
+  await nextWrite;
+}
+
+export async function recoverInterruptedWork() {
+  await writeDB((data) => {
+    const timestamp = new Date().toISOString();
+
+    for (const interview of data.interviews) {
+      if (interview.status === 'transcribing' || interview.status === 'analyzing') {
+        interview.status = 'failed';
+        interview.errorMessage = 'Server restarted before the async interview job finished. Please retry.';
+        interview.updatedAt = timestamp;
+      }
+    }
+
+    for (const asset of data.questionMediaAssets) {
+      if (asset.status === 'queued' || asset.status === 'generating') {
+        asset.status = 'failed';
+        asset.errorMessage = 'Server restarted before question media generation finished. Please retry.';
+        asset.updatedAt = timestamp;
+      }
+    }
+  });
 }
 
 function normalizeDB(data: Partial<DatabaseShape>): DatabaseShape {
@@ -112,4 +135,10 @@ function normalizeDB(data: Partial<DatabaseShape>): DatabaseShape {
     transcripts: data.transcripts || [],
     analyses: data.analyses || []
   };
+}
+
+async function atomicWriteJson(filePath: string, data: DatabaseShape) {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+  await fs.rename(tmpPath, filePath);
 }

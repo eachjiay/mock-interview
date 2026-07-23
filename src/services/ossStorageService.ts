@@ -10,7 +10,8 @@ const ossClient =
         accessKeyId: config.ossAccessKeyId,
         accessKeySecret: config.ossAccessKeySecret,
         secure: config.ossSecure,
-        authorizationV4: true
+        authorizationV4: true,
+        timeout: 180000
       })
     : null;
 

@@ -9,6 +9,8 @@ export async function createInterview(input: CreateInterviewInput): Promise<Inte
     data.interviews.push({
       id: createdId,
       candidateName: input.candidateName,
+      questionId: input.questionId,
+      documentId: input.documentId,
       questionText: input.questionText,
       referenceText: input.referenceText,
       notes: input.notes,

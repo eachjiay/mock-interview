@@ -51,7 +51,7 @@ Recommended defaults:
 - `OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`
 - `OPENAI_SCORING_MODEL=gpt-4o-mini`
 - `OPENAI_TTS_MODEL=gpt-4o-mini-tts`
-- `OPENAI_TTS_VOICE=cedar`
+- `OPENAI_TTS_VOICE=marin`
 
 ## Docker deployment
 
@@ -233,7 +233,7 @@ POST /api/questions/12/media/generate
 Content-Type: application/json
 
 {
-  "voice": "cedar",
+  "voice": "marin",
   "avatarName": "default-interviewer",
   "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png",
   "force": false
@@ -248,7 +248,7 @@ Content-Type: application/json
 
 {
   "documentId": 1,
-  "voice": "cedar",
+  "voice": "marin",
   "imageUrl": "https://cdn.example.com/mock-interview/interviewer.png"
 }
 ```
@@ -449,8 +449,8 @@ Useful env variables:
 ```env
 QUESTION_MEDIA_DIR=./uploads/question-media
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
-OPENAI_TTS_VOICE=cedar
-OPENAI_TTS_INSTRUCTIONS=Speak clearly and naturally in Mandarin Chinese for a mock interview prompt.
+OPENAI_TTS_VOICE=marin
+OPENAI_TTS_INSTRUCTIONS=Speak in natural Mandarin Chinese using a warm, professional adult female voice. Sound calm, confident, and attentive, like an experienced interviewer. Use a moderate pace and clear pronunciation. Ask the question directly without adding or omitting content.
 DEFAULT_QUESTION_IMAGE_URL=
 DEFAULT_QUESTION_VIDEO_URL=
 ```
@@ -462,7 +462,7 @@ POST /api/questions/12/media/generate
 Content-Type: application/json
 
 {
-  "voice": "cedar",
+  "voice": "marin",
   "avatarName": "default-interviewer",
   "imageUrl": "https://oss.example.com/mock-interview/interviewer.png",
   "force": false
@@ -477,7 +477,7 @@ Content-Type: application/json
 
 {
   "documentId": 1,
-  "voice": "cedar",
+  "voice": "marin",
   "imageUrl": "https://oss.example.com/mock-interview/interviewer.png"
 }
 ```

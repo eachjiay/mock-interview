@@ -1,0 +1,1 @@
+17 */12 * * * root /opt/mock-interview-proxy/renew-ip-certificate.sh >>/var/log/mock-interview-cert-renew.log 2>&1
