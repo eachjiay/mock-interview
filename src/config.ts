@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const rootDir = process.cwd();
+const nodeEnv = process.env.NODE_ENV || 'development';
 
 function resolvePath(value: string | undefined, fallback: string) {
   return path.isAbsolute(value || '') ? (value as string) : path.join(rootDir, value || fallback);
@@ -14,8 +15,14 @@ function normalizeBaseUrl(value: string | undefined) {
 }
 
 export const config = {
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
+  host: process.env.HOST || '127.0.0.1',
   port: Number(process.env.PORT || 5050),
+  trustProxy: Number(process.env.TRUST_PROXY || (nodeEnv === 'production' ? 1 : 0)),
+  corsOrigins: (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
   dbPath: resolvePath(process.env.DB_PATH, './data/app.json'),
   uploadDir: resolvePath(process.env.UPLOAD_DIR, './uploads'),
   questionMediaDir: resolvePath(process.env.QUESTION_MEDIA_DIR, './uploads/question-media'),

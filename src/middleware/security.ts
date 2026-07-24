@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { config } from '../config.js';
 
@@ -7,12 +8,22 @@ interface RateBucket {
 }
 
 const rateBuckets = new Map<string, RateBucket>();
+let lastPruneAt = 0;
 
 export function createRateLimiter(options: { max: number; windowMs?: number; label: string }) {
   const windowMs = options.windowMs || config.apiRateLimitWindowMs;
 
   return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
+    if (now - lastPruneAt >= windowMs) {
+      for (const [key, value] of rateBuckets) {
+        if (value.resetAt <= now) {
+          rateBuckets.delete(key);
+        }
+      }
+      lastPruneAt = now;
+    }
+
     const key = `${options.label}:${req.ip || req.socket.remoteAddress || 'unknown'}`;
     const bucket = rateBuckets.get(key);
 
@@ -52,7 +63,7 @@ export function requireAdminToken(req: Request, res: Response, next: NextFunctio
 
   const headerToken = req.header('x-admin-token') || '';
   const bearerToken = parseBearerToken(req.header('authorization') || '');
-  if (headerToken === config.adminApiToken || bearerToken === config.adminApiToken) {
+  if (tokensMatch(headerToken, config.adminApiToken) || tokensMatch(bearerToken, config.adminApiToken)) {
     next();
     return;
   }
@@ -60,6 +71,17 @@ export function requireAdminToken(req: Request, res: Response, next: NextFunctio
   res.status(401).json({
     error: 'Admin token is required.'
   });
+}
+
+function tokensMatch(candidate: string, expected: string) {
+  if (!candidate || !expected) {
+    return false;
+  }
+
+  const candidateBuffer = Buffer.from(candidate);
+  const expectedBuffer = Buffer.from(expected);
+  return candidateBuffer.length === expectedBuffer.length
+    && crypto.timingSafeEqual(candidateBuffer, expectedBuffer);
 }
 
 function parseBearerToken(value: string) {

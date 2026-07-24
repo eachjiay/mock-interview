@@ -10,9 +10,35 @@ import { createRateLimiter } from './middleware/security.js';
 
 const app = express();
 
-app.use(cors());
+app.disable('x-powered-by');
+app.set('trust proxy', config.trustProxy);
+if (config.nodeEnv !== 'production') {
+  app.use(cors());
+} else if (config.corsOrigins.length > 0) {
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || config.corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('CORS origin is not allowed.'));
+    }
+  }));
+}
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
+  next();
+});
 app.use(express.json({ limit: '2mb' }));
-app.use('/uploads', express.static(config.uploadDir));
+app.use('/uploads/question-media', express.static(config.questionMediaDir, {
+  dotfiles: 'deny',
+  fallthrough: false,
+  index: false,
+  maxAge: config.nodeEnv === 'production' ? '1h' : 0
+}));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.use('/api', createRateLimiter({
   label: 'api',

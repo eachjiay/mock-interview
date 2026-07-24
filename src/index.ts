@@ -8,8 +8,8 @@ async function start() {
   await ensureDir(config.uploadDir);
   await initDB();
   await recoverInterruptedWork();
-  app.listen(config.port, () => {
-    console.log(`mock-interview-backend listening on ${config.port}`);
+  app.listen(config.port, config.host, () => {
+    console.log(`mock-interview-backend listening on ${config.host}:${config.port}`);
     if (config.questionMediaAutoGenerateAll) {
       void queueBatchQuestionMediaGeneration()
         .then((result) => {
